@@ -1,0 +1,73 @@
+{# want to edit this twig? I suggest running mvn package in dtos then editing the #}
+{# target/ts/websocket-services.ts file, then porting your changes back to here  #}
+
+interface ClientMessage {
+    type: string;
+    args: object;
+}
+
+interface ServerMessage {
+    event: string;
+    data: any;
+}
+
+interface ConnectionEvents {
+    onOpen?: (ev: Event) => void
+    onClose?: (ev: CloseEvent) => void
+    onError?: (ev: Event) => void
+}
+
+{% for service in services %}
+export class {{ service.name }} {
+    private readonly listeners: { [key: string]: Function[] } = {};
+    private readonly ws: WebSocket;
+    constructor({onOpen, onClose, onError}: ConnectionEvents = {}) {
+        const SITE_PROTOCOL = window.location.protocol.match(/^https/) ? 'wss' : 'ws';
+        this.ws = new WebSocket(`${SITE_PROTOCOL}://${window.location.host}/services/websocket/ChatApi`)
+        onOpen && this.ws.addEventListener('open', onOpen)
+        onClose && this.ws.addEventListener('close', onClose)
+        onError && this.ws.addEventListener('error', onError)
+        this.ws.addEventListener('message', this.handleMessage.bind(this));
+    }
+
+    private handleMessage(message: MessageEvent) {
+        const {event, data} = JSON.parse(message.data) as ServerMessage;
+        const listeners = this.listeners[event] || []
+        listeners.forEach(handler => handler(data));
+    }
+
+    private addListener(eventName: string, handler: Function) {
+        if (!this.listeners[eventName]) {
+            this.listeners[eventName] = [];
+        }
+        this.listeners[eventName].push(handler);
+        this._send({ type: "register", args: { event: eventName } });
+    }
+
+    private _send(message: ClientMessage) {
+        this.ws.send(JSON.stringify(message));
+    }
+
+{% for method in service.clientMethods %}
+    {{method.name}}(
+        {% for arg in method.filter %}{{ arg.name }}: {{ arg.type }}, {% endfor %}
+    {{- method.name }}: ({% for arg in method.args %}{{arg.name}}: {{ arg.type}}, {% endfor %}) => void
+    ) {
+        this.addListener(
+            `{{ method.event }}`,
+            ({ {% for arg in method.args %}{{arg.name}}, {% endfor %} }: { {% for arg in method.args %}{{arg.name}}: {{ arg.type}}, {% endfor %} }) => {{ method.name }}({% for arg in method.args %}{{arg.name}}, {% endfor %})
+        );
+    }
+{% endfor %}
+
+{% for method in service.serverMethods %}
+    {{ method.name }}({% for arg in method.args %}{{ arg.name }}: {{ arg.type }},{% endfor %}) {
+        this._send({ type: '{{ method.name }}', args: { {% for arg in method.args %} {{ arg.name }}, {% endfor %}} });
+    }
+{% endfor %}
+
+close(code?: number, reason?: string){
+    this.ws.close(code, reason)
+}
+}
+{% endfor %}
