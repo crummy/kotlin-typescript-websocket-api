@@ -1,0 +1,21 @@
+{
+  "scripts": {
+    "build": "run build:css && run build:js",
+    "build:ts": "esbuild src/App.tsx --bundle --outfile=src/chat.js",
+    "build:css": "npx tailwindcss -i ./src/app.css -o ./public/app.css --minify",
+    "watch": "concurrently npm:watch:*",
+    "watch:ts": "esbuild src/App.tsx --bundle --outfile=src/chat.js --watch",
+    "watch:css": "npx tailwindcss -i ./src/input.css -o ./src/output.css --watch"
+  },
+  "dependencies": {
+    "esbuild": "^0.15.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^7.3.0",
+    "@types/react": "^18.0.18",
+    "@types/react-dom": "^18.0.6",
+    "tailwindcss": "^3.1.8"
+  }
+}
